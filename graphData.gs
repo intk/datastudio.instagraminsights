@@ -107,12 +107,13 @@ function graphData(request, query) {
       });
   var instagramId = JSON.parse(instagramResponse).instagram_business_account.id;
   
-  requestEndpoint += instagramId;
+  requestEndpoint += instagramId+"/";
   
   
   // Define data object to push the graph data to
   var dataObj = {};
  // console.log(queryChunks);
+  
   
   // If page name, id
   if (query.indexOf('?fields=id,name') > -1) {
@@ -128,24 +129,22 @@ function graphData(request, query) {
       });
     
     dataObj = JSON.parse(response);
-    console
   }
   
-
-  /*
   // If posts object
-  else if (query.indexOf('posts') > -1) {
+  else if (query.indexOf('media') > -1) {
     // Set date range parameters
-    var dateRangeSince = queryChunks[0]['since'].toISOString().slice(0, 10);
+    /*var dateRangeSince = queryChunks[0]['since'].toISOString().slice(0, 10);
     var dateRangeUntil = queryChunks[queryChunks.length-1]['until'].toISOString().slice(0, 10);
     
     var dateRange = "&since="+dateRangeSince+"&until="+dateRangeUntil;
+    */
         
     // Perform API Request
-    var requestUrl = requestEndpoint+query+dateRange+"&access_token="+pageToken;
+    var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
     
-    //console.log(requestUrl);
-    
+    console.log(requestUrl);
+        
     var response = UrlFetchApp.fetch(requestUrl,
       {
         muteHttpExceptions : true
@@ -155,7 +154,7 @@ function graphData(request, query) {
         
     
   // All other objects  
-  } else {
+  } /*else {
   
     dataObj['data'] = [];
     dataObj['data'][0] = {};

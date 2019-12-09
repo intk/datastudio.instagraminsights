@@ -34,6 +34,44 @@ function getFields() {
       .setId('accountId')
       .setName('Account ID')
       .setType(types.TEXT);  
+  
+   fields.newDimension()
+      .setId('postDate')
+      .setName('Post Date')
+      .setType(types.YEAR_MONTH_DAY);
+  
+   fields.newDimension()
+      .setId('postId')
+      .setName('Post ID')
+      .setType(types.TEXT);  
+
+  fields.newDimension()
+      .setId('postCaption')
+      .setName('Post Caption')
+      .setType(types.TEXT);  
+
+  fields.newDimension()
+      .setId('postLink')
+      .setName('Link to post')
+      .setType(types.URL);
+  
+  fields.newDimension()
+       .setId('postMessageHyperLink')
+       .setName('Post Message Link')
+       .setType(types.HYPERLINK)
+       .setFormula('HYPERLINK($postLink,$postCaption)');
+  
+  fields.newMetric()
+      .setId('postLikes')
+      .setName('Likes on post')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newMetric()
+      .setId('postComments')
+      .setName('Comments on post')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
     
   return fields;
 }
@@ -63,6 +101,9 @@ function getData(request) {
     while (rows.length < 1) {
       if (field.name == 'accountId') {
         outputData.account_id = graphData(request, "?fields=id,name");
+      }
+      if (field.name == 'postId' || field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink' || field.name == 'postLikes' || field.name == 'postComments') {
+        outputData.posts = graphData(request, "media?fields=id,caption,timestamp,permalink,like_count,comments_count");
       }
     
     if (typeof outputData !== 'undefined') {    
@@ -99,12 +140,50 @@ function reportAccountId(report) {
   return rows;
 }
 
+function reportPosts(report) {  
+  var rows = [];
+  
+  // Loop posts
+  for( var i = 0; i < report.data.length; i++) {
+    
+    // Define empty row object
+    var row = {};
+    row["postId"] = report.data[i]['id'];
+    
+    //Return date object to ISO formatted string
+    row["postDate"] = new Date(report.data[i]['timestamp']).toISOString().slice(0, 10);
+    
+    row["postCaption"] = report.data[i]['caption'];
+    row["postLink"] = report.data[i]['permalink'];
+    
+    row["postLikes"] = 0;
+    
+    // Determine if likes object exist
+    if (typeof report.data[i]['like_count'] !== 'undefined') {
+      row["postLikes"] = report.data[i]['like_count'];
+    }
+    
+    row["postComments"] = 0;
+    if (typeof report.data[i]['comments_count'] !== 'undefined') {
+      row["postComments"] = report.data[i]['comments_count'];
+    }
+    
+    // Assign all post data to rows list
+    rows.push(row);
+  }
+  return rows;
+}
+
+
 function reportToRows(requestedFields, report) {
   var rows = [];
   var data = [];  
   
   if (typeof report.account_id !== 'undefined') {
     data = reportAccountId(report.account_id) || [];
+  } 
+  if (typeof report.posts !== 'undefined') {
+    data = reportPosts(report.posts) || [];
   } 
   
   //If data doesn't contain any values
@@ -118,10 +197,29 @@ function reportToRows(requestedFields, report) {
     requestedFields.asArray().forEach(function (field) {
       
       // Assign field data values to rows
+       if (field.getId().indexOf('post') > -1 && typeof data[i]["postDate"] !== 'undefined') {
+        //console.log("ReportToRows_Posts: %s", data[i]["postDate"]);
         switch (field.getId()) {
-          case 'accountId':
-            return row.push(data[i]["accountId"]);
+          case 'postDate':
+            return row.push(data[i]["postDate"].replace(/-/g,''));
+          case 'postId':
+            return row.push(data[i]["postId"]);
+          case 'postCaption':
+            return row.push(data[i]["postCaption"]);
+          case 'postLink':
+            return row.push(data[i]["postLink"]);
+          case 'postLikes':
+            return row.push(data[i]["postLikes"]);
+          case 'postComments':
+            return row.push(data[i]["postComments"]);
         }
+       } else {
+
+         switch (field.getId()) {
+           case 'accountId':
+             return row.push(data[i]["accountId"]);
+         }
+       }
       
       
     });
