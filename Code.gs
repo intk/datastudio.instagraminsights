@@ -5,7 +5,7 @@ function getConfig() {
 
   config.newInfo()
       .setId('instructions')
-  .setText('Please enter the configuration data for your Facebook connector');
+  .setText('Please enter the configuration data for your Instagram connector');
 
   config.newTextInput()
       .setId('page_id')
@@ -28,61 +28,50 @@ function getConfig() {
 function getFields() {
   var fields = cc.getFields();
   var types = cc.FieldType;
-  var aggregations = cc.AggregationType;  
-  
-  fields.newMetric()
-      .setId('pageFans')
-      .setName('Total Fans')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-  fields.newMetric()
-      .setId('pageImpressionsTotal')
-      .setName('Total Impressions')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-  fields.newMetric()
-      .setId('pageImpressionsOrganic')
-      .setName('Organic Impressions')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-  fields.newMetric()
-      .setId('pageImpressionsPaid')
-      .setName('Paid Impressions')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-  fields.newMetric()
-      .setId('pageImpressionsViral')
-      .setName('Viral Impressions')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-   fields.newDimension()
-      .setId('pageFansAge')
-      .setName('Age')
-      .setType(types.TEXT);
-  
-   fields.newMetric()
-      .setId('pageFansAgeNumber')
-      .setName('Fans per Age')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
+  var aggregations = cc.AggregationType; 
   
   fields.newDimension()
-      .setId('pageFansGender')
-      .setName('Gender')
-      .setType(types.TEXT);
+      .setId('accountId')
+      .setName('Account ID')
+      .setType(types.TEXT);  
   
-   fields.newMetric()
-      .setId('pageFansGenderNumber')
-      .setName('Fans per Gender')
+   fields.newDimension()
+      .setId('postDate')
+      .setName('Post Date')
+      .setType(types.YEAR_MONTH_DAY);
+  
+   fields.newDimension()
+      .setId('postId')
+      .setName('Post ID')
+      .setType(types.TEXT);  
+
+  fields.newDimension()
+      .setId('postCaption')
+      .setName('Post Caption')
+      .setType(types.TEXT);  
+
+  fields.newDimension()
+      .setId('postLink')
+      .setName('Link to post')
+      .setType(types.URL);
+  
+  fields.newDimension()
+       .setId('postMessageHyperLink')
+       .setName('Post Message Link')
+       .setType(types.HYPERLINK)
+       .setFormula('HYPERLINK($postLink,$postCaption)');
+  
+  fields.newMetric()
+      .setId('postLikes')
+      .setName('Likes on post')
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
-  
+  fields.newMetric()
+      .setId('postComments')
+      .setName('Comments on post')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
     
   return fields;
 }
@@ -95,232 +84,143 @@ function getSchema(request) {
 
 function getData(request) {  
   
-  
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
   });
   
   var outputData = {};
+  var requestedFields = getFields().forIds(requestedFieldIds);
+
   
   // Perform data request per field
   request.fields.forEach(function(field) {
     
-    if (field.name == 'pageFans') {
-      outputData.page_fans = graphData(request, "insights/page_fans?fields=values");
+    var rows = [];
+    
+    // Try to re-assign data when it fails at first attempt, until rows are filled in
+    while (rows.length < 1) {
+      if (field.name == 'accountId') {
+        outputData.account_id = graphData(request, "?fields=id,name");
+      }
+      if (field.name == 'postId' || field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink' || field.name == 'postLikes' || field.name == 'postComments') {
+        outputData.posts = graphData(request, "media?fields=id,caption,timestamp,permalink,like_count,comments_count");
+      }
+    
+    if (typeof outputData !== 'undefined') {    
+       rows = reportToRows(requestedFields, outputData);
+        // TODO: parseData.paging.next != undefined
+    } else {
+       rows = [];
     }
-    if (field.name == 'pageImpressionsTotal') {
-      outputData.page_impressions_total = graphData(request, "insights/page_impressions/day?fields=values");
+     // Only break attempt to re-assign data if there is no data at all
+     if (rows[0] == 'no-data') {
+       rows = [];
+       break;
     }
-    if (field.name == 'pageImpressionsOrganic') {
-      outputData.page_impressions_organic = graphData(request, "insights/page_impressions_organic/day?fields=values");
-    }
-    if (field.name == 'pageImpressionsPaid') {
-      outputData.page_impressions_paid = graphData(request, "insights/page_impressions_paid/day?fields=values");
-    }
-    if (field.name == 'pageImpressionsViral') {
-      outputData.page_impressions_viral = graphData(request, "insights/page_impressions_viral/day?fields=values");
-    }
-    if (field.name == 'pageFansAge' || field.name == 'pageFansGender') {
-      outputData.page_fans_gender_age = graphData(request, "insights/page_fans_gender_age?fields=values");
+      
+      result = {
+        schema: requestedFields.build(),
+        rows: rows
+      };  
     }
   });
   
-  var requestedFields = getFields().forIds(requestedFieldIds);
-  
-  if(typeof outputData !== 'undefined')
-  {    
-    rows = reportToRows(requestedFields, outputData);
-    // TODO: parseData.paging.next != undefined
-  } else {
-    rows = [];
-  }
-  
-  result = {
-    schema: requestedFields.build(),
-    rows: rows
-  };  
-  
   //cache.put(request_hash, JSON.stringify(result));
   return result;  
+  
 }
 
-function reportPageFans(report) {
+function reportAccountId(report) {
   var rows = [];
     
-  // Only report last number of page likes within date range
   var row = {};
-  var valueRows = report['data'][0]['values'][0];
-  row["pageFans"] = report['data'][0]['values'][0][valueRows.length-1]['value'];
+  row["accountId"] = report['id'];
   rows[0] = row;
   
   return rows;
-  
 }
 
-// Report all daily reports to rows 
-function reportDaily(report, type) {
+function reportPosts(report) {  
   var rows = [];
   
-  var valueRows = report['data'][0]['values'][0];
-  
-  // Loop report
-  for (var i = 0; i < valueRows.length; i++) {
+  // Loop posts
+  for( var i = 0; i < report.data.length; i++) {
+    
+    // Define empty row object
     var row = {};
+    row["postId"] = report.data[i]['id'];
     
-    row[type] = report['data'][0]['values'][0][i]['value'];
+    //Return date object to ISO formatted string
+    row["postDate"] = new Date(report.data[i]['timestamp']).toISOString().slice(0, 10);
     
-    // Assign all data to rows list
+    row["postCaption"] = report.data[i]['caption'];
+    row["postLink"] = report.data[i]['permalink'];
+    
+    row["postLikes"] = 0;
+    
+    // Determine if likes object exist
+    if (typeof report.data[i]['like_count'] !== 'undefined') {
+      row["postLikes"] = report.data[i]['like_count'];
+    }
+    
+    row["postComments"] = 0;
+    if (typeof report.data[i]['comments_count'] !== 'undefined') {
+      row["postComments"] = report.data[i]['comments_count'];
+    }
+    
+    // Assign all post data to rows list
     rows.push(row);
   }
-  
   return rows;
 }
 
-function reportGenderAge(report) {
-  var rows = [];
-  //Define fans per gender (female, male, unknown)
-  var fans = {};
-  fans['Female'] = 0;
-  fans['Male'] = 0;
-  fans['Unknown'] = 0;
-  
-  // Define fans per age
-  fans['13-17'] = 0;
-  fans['18-24'] = 0;
-  fans['25-34'] = 0;
-  fans['35-44'] = 0;
-  fans['45-54'] = 0;
-  fans['55-64'] = 0;
-  fans['65+'] = 0;
-  
-  // Only report last number of fans per gender/age within date range
-  // Get gender/age objects
-  var results = report.data[0].values[0][report.data[0].values[0].length-1]['value'];
-  console.info(results);
-  
-  // Loop all objects
-  for (var property in results) {
-    if (results.hasOwnProperty(property)) {
-      
-      // Assign values to gender
-      switch (true) {
-        case (property.indexOf('F') > -1):
-        fans['Female'] += results[property];
-        break;
-        case (property.indexOf('M') > -1):
-        fans['Male'] += results[property];
-        break;
-        case (property.indexOf('U') > -1):
-        fans['Unknown'] += results[property];
-        break;
-      }
-      
-      // Assign values to age
-      switch (true) {
-        case (property.indexOf('13-17') > -1):
-          fans['13-17'] += results[property];
-          break;
-        case (property.indexOf('18-24') > -1):
-          fans['18-24'] += results[property];
-          break;
-        case (property.indexOf('25-34') > -1):
-          fans['25-34'] += results[property];
-          break;
-        case (property.indexOf('35-44') > -1):
-          fans['35-44'] += results[property];
-          break;
-        case (property.indexOf('45-54') > -1):
-          fans['45-54'] += results[property];
-          break;
-        case (property.indexOf('55-64') > -1):
-          fans['55-64'] += results[property];
-          break;
-        case (property.indexOf('65+') > -1):
-          fans['65+'] += results[property];
-          break;
-      }
-      
-    }
-  }
-  
-  for (var property in fans) {
-    var row = {};
-    if (fans.hasOwnProperty(property)) {
-      if (property.indexOf('Female') > -1 || property.indexOf('Male') > -1 || property.indexOf('Unknown') > -1) {
-        row['pageFansGender'] = property;
-        row['pageFansGenderNumber'] = fans[property];
-      } else { 
-        row['pageFansAge'] = property;
-        row['pageFansAgeNumber'] = fans[property];
-      }
-    }
-    rows.push(row);
-     
-   }
-  
-  console.log(rows);
-  
-  return rows;
-  
-}
 
 function reportToRows(requestedFields, report) {
   var rows = [];
   var data = [];  
   
-  if (typeof report.page_fans !== 'undefined') {
-    data = data.concat(reportPageFans(report.page_fans));
-  }
-  if (typeof report.page_impressions_total !== 'undefined') {
-    data = reportDaily(report.page_impressions_total, 'pageImpressionsTotal');
-  }  
-  if (typeof report.page_impressions_organic !== 'undefined') {
-    data = reportDaily(report.page_impressions_organic, 'pageImpressionsOrganic');
-  }
-  if (typeof report.page_impressions_paid !== 'undefined') {
-    data = reportDaily(report.page_impressions_paid, 'pageImpressionsPaid');
-  }  
-  if (typeof report.page_impressions_viral !== 'undefined') {
-    data = reportDaily(report.page_impressions_viral, 'pageImpressionsViral');
-  }
-  if (typeof report.page_fans_gender_age !== 'undefined') {
-    data = reportGenderAge(report.page_fans_gender_age);
-  }  
+  if (typeof report.account_id !== 'undefined') {
+    data = reportAccountId(report.account_id) || [];
+  } 
+  if (typeof report.posts !== 'undefined') {
+    data = reportPosts(report.posts) || [];
+  } 
   
+  //If data doesn't contain any values
+  if (data.length < 1) {
+    return ['no-data'];
+  } else {
     
   // Merge data
   for(var i = 0; i < data.length; i++) {
     row = [];    
     requestedFields.asArray().forEach(function (field) {
-  
+      
+      // Assign field data values to rows
+       if (field.getId().indexOf('post') > -1 && typeof data[i]["postDate"] !== 'undefined') {
+        //console.log("ReportToRows_Posts: %s", data[i]["postDate"]);
+        switch (field.getId()) {
+          case 'postDate':
+            return row.push(data[i]["postDate"].replace(/-/g,''));
+          case 'postId':
+            return row.push(data[i]["postId"]);
+          case 'postCaption':
+            return row.push(data[i]["postCaption"]);
+          case 'postLink':
+            return row.push(data[i]["postLink"]);
+          case 'postLikes':
+            return row.push(data[i]["postLikes"]);
+          case 'postComments':
+            return row.push(data[i]["postComments"]);
+        }
+       } else {
+
          switch (field.getId()) {
-           case 'pageFans':
-              return row.push(data[i]["pageFans"]);
-           case 'pageImpressionsOrganic':
-             return row.push(data[i]["pageImpressionsOrganic"]);
-           case 'pageImpressionsPaid':
-             return row.push(data[i]["pageImpressionsPaid"]);
-           case 'pageImpressionsViral':
-             return row.push(data[i]["pageImpressionsViral"]);
-           case 'pageImpressionsTotal':
-             return row.push(data[i]["pageImpressionsTotal"]);
-           case 'pageFansAge':
-              if (typeof data[i]["pageFansAge"] !== 'undefined') {
-                return row.push(data[i]["pageFansAge"]);
-              }
-           case 'pageFansAgeNumber':
-             if (typeof data[i]["pageFansAgeNumber"] !== 'undefined') {
-               return row.push(data[i]["pageFansAgeNumber"]);
-             }
-           case 'pageFansGender':
-             if (typeof data[i]["pageFansGender"] !== 'undefined') {
-               return row.push(data[i]["pageFansGender"]);
-             }
-           case 'pageFansGenderNumber':
-             if (typeof data[i]["pageFansGenderNumber"] !== 'undefined') {
-               return row.push(data[i]["pageFansGenderNumber"]);
-             }
+           case 'accountId':
+             return row.push(data[i]["accountId"]);
          }
+       }
+      
       
     });
     if (row.length > 0) {
@@ -329,6 +229,8 @@ function reportToRows(requestedFields, report) {
   }
     
   return rows;
+    
+  }
 }
 
 
@@ -364,7 +266,7 @@ function getOAuthService() {
     .setClientSecret(CLIENT_SECRET)
     .setPropertyStore(PropertiesService.getUserProperties())
     .setCallbackFunction('authCallback')
-    .setScope('pages_show_list, manage_pages, read_insights');
+    .setScope('pages_show_list, manage_pages, instagram_manage_insights, instagram_basic');
 };
 
 function authCallback(request) {

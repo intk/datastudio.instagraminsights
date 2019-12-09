@@ -1,7 +1,10 @@
 // Get data from Facebook Graph API
 function graphData(request, query) {
   var pageId = request.configParams['page_id'];
-  var requestEndpoint = "https://graph.facebook.com/v5.0/"+pageId+"/"
+  
+  var requestEndpoint = "https://graph.facebook.com/v5.0/";
+    
+ /*
   
   // Set start and end date for query
   var startDate = new Date(request['dateRange'].startDate);
@@ -11,13 +14,13 @@ function graphData(request, query) {
   -------------------------------------------------------
   Create chunks of the date range because of query limit
   -------------------------------------------------------
-  */
+  //
   
   var offset = 2; // Results are reported the day after the startDate and between 'until'. So 2 days are added.
   var chunkLimit = 93 - offset; // Limit of 93 days of data per query
   var daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24); // Calculate time difference in milliseconds. Then divide it with milliseconds per day 
   
-  console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
+  //console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
     
   // Split date range into chunks
   var queryChunks = [];
@@ -66,10 +69,10 @@ function graphData(request, query) {
       chunk['since'] = startDate;
       chunk['until'] = new Date(endDate.getTime()+(86400000*offset)); //endDate + until offset in milliseconds
     
-    // If until is after today, make sure the until date is today
-    if (chunk['until'].getTime() > new Date().getTime()) {
-       chunk['until'] = new Date(endDate.getTime()+(86400000*offset-1)); //endDate + until offset in milliseconds
-    }
+    // When date range is 'yesterday', make sure the until date is today
+    /*if (endDate == startDate) {
+       chunk['until'] = new Date(endDate.getTime()+(86400000*offset)-1); //endDate + until offset in milliseconds
+    }//
     
       // Add chunk to queryChunks list
       queryChunks.push(chunk);
@@ -81,7 +84,6 @@ function graphData(request, query) {
   ------------------------------------------------------
   */
   
-  
   /*
   //Get page access token
   var tokenUrl = requestEndpoint+"?fields=access_token";
@@ -91,26 +93,33 @@ function graphData(request, query) {
         muteHttpExceptions : true
       });
   var pageToken = JSON.parse(tokenResponse).access_token;
+  //
   */
   
   //Use pageToken for testing purposes
   var pageToken = PAGE_TOKEN;
+    
+  //Get instagram account ID
+  var instagramUrl = requestEndpoint+pageId+"/?fields=instagram_business_account&access_token="+pageToken;
+  var instagramResponse = UrlFetchApp.fetch(instagramUrl,
+      {
+        muteHttpExceptions : true
+      });
+  var instagramId = JSON.parse(instagramResponse).instagram_business_account.id;
+  
+  requestEndpoint += instagramId+"/";
+  
   
   // Define data object to push the graph data to
   var dataObj = {};
+ // console.log(queryChunks);
   
   
-  // If posts object
-  
-  if (query.indexOf('posts') > -1) {
-    // Set date range parameters
-    var dateRangeSince = queryChunks[0]['since'].toISOString().slice(0, 10);
-    var dateRangeUntil = queryChunks[queryChunks.length-1]['until'].toISOString().slice(0, 10);
-    
-    var dateRange = "&since="+dateRangeSince+"&until="+dateRangeUntil;
+  // If page name, id
+  if (query.indexOf('?fields=id,name') > -1) {
         
     // Perform API Request
-    var requestUrl = requestEndpoint+query+dateRange+"&access_token="+pageToken;
+    var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
     
     console.log(requestUrl);
     
@@ -120,10 +129,32 @@ function graphData(request, query) {
       });
     
     dataObj = JSON.parse(response);
+  }
+  
+  // If posts object
+  else if (query.indexOf('media') > -1) {
+    // Set date range parameters
+    /*var dateRangeSince = queryChunks[0]['since'].toISOString().slice(0, 10);
+    var dateRangeUntil = queryChunks[queryChunks.length-1]['until'].toISOString().slice(0, 10);
     
+    var dateRange = "&since="+dateRangeSince+"&until="+dateRangeUntil;
+    */
+        
+    // Perform API Request
+    var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
+    
+    console.log(requestUrl);
+        
+    var response = UrlFetchApp.fetch(requestUrl,
+      {
+        muteHttpExceptions : true
+      });
+    
+    dataObj = JSON.parse(response);
+        
     
   // All other objects  
-  } else {
+  } /*else {
   
     dataObj['data'] = [];
     dataObj['data'][0] = {};
@@ -142,7 +173,7 @@ function graphData(request, query) {
       // Perform API Request
       var requestUrl = requestEndpoint+query+dateRange+"&access_token="+pageToken;
       
-      console.log(requestUrl);
+      //console.log(requestUrl);
             
       var response = UrlFetchApp.fetch(requestUrl,
                                        {
@@ -159,7 +190,8 @@ function graphData(request, query) {
     }
   }
   
-  console.log(JSON.stringify(dataObj));
+  //console.log(JSON.stringify(dataObj));
+  */
   
   
   return dataObj;
