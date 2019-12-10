@@ -3,8 +3,6 @@ function graphData(request, query) {
   var pageId = request.configParams['page_id'];
   
   var requestEndpoint = "https://graph.facebook.com/v5.0/";
-    
- /*
   
   // Set start and end date for query
   var startDate = new Date(request['dateRange'].startDate);
@@ -14,10 +12,10 @@ function graphData(request, query) {
   -------------------------------------------------------
   Create chunks of the date range because of query limit
   -------------------------------------------------------
-  //
+  */
   
-  var offset = 2; // Results are reported the day after the startDate and between 'until'. So 2 days are added.
-  var chunkLimit = 93 - offset; // Limit of 93 days of data per query
+  var offset = 1; // Results are reported on the day of the startDate and between 'until'. So 1 day is added.
+  var chunkLimit = 30 - offset; // Limit of 30 days of data per query
   var daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24); // Calculate time difference in milliseconds. Then divide it with milliseconds per day 
   
   //console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
@@ -41,7 +39,7 @@ function graphData(request, query) {
               
       // If a chunk already is added to the queryChunks list
       } else {
-        chunk['since'] = new Date(queryChunks[i-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 2 days. 'Since' should start 1 day after last date range chunk
+        chunk['since'] = new Date(queryChunks[i-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 1 day. 'Since' should start 1 day after last date range chunk
         chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(chunkLimit+offset-1)));
       }
             
@@ -54,7 +52,7 @@ function graphData(request, query) {
       
       var leftoverDays = Math.floor((chunksAmount - queryChunks.length) * chunkLimit) // Decimal number * chunkLimit rounded down gives the amount of leftover days
       var chunk = {};
-      chunk['since'] = new Date(queryChunks[queryChunks.length-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 2 days. 'Since' should start 1 day after last date range chunk
+      chunk['since'] = new Date(queryChunks[queryChunks.length-1]['until'].getTime()-(86400000*(offset-1))); // 'Since' should start 1 day after last date range chunk
       chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(leftoverDays + offset)));
       
       // Add chunk to queryChunks list
@@ -72,11 +70,13 @@ function graphData(request, query) {
     // When date range is 'yesterday', make sure the until date is today
     /*if (endDate == startDate) {
        chunk['until'] = new Date(endDate.getTime()+(86400000*offset)-1); //endDate + until offset in milliseconds
-    }//
+    }*/
     
       // Add chunk to queryChunks list
       queryChunks.push(chunk);
   }
+  
+  console.log(JSON.stringify(queryChunks));
    
   /*
   ------------------------------------------------------
@@ -115,8 +115,8 @@ function graphData(request, query) {
  // console.log(queryChunks);
   
   
-  // If page name, id
-  if (query.indexOf('?fields=id,name') > -1) {
+  // If page name, id, followers_count
+  if (query.indexOf('?fields=id,name') > -1 || query.indexOf('?fields=followers_count') > -1) {
         
     // Perform API Request
     var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
@@ -154,7 +154,7 @@ function graphData(request, query) {
         
     
   // All other objects  
-  } /*else {
+  } else {
   
     dataObj['data'] = [];
     dataObj['data'][0] = {};
@@ -172,9 +172,7 @@ function graphData(request, query) {
       
       // Perform API Request
       var requestUrl = requestEndpoint+query+dateRange+"&access_token="+pageToken;
-      
-      //console.log(requestUrl);
-            
+                  
       var response = UrlFetchApp.fetch(requestUrl,
                                        {
                                          muteHttpExceptions : true
@@ -190,9 +188,7 @@ function graphData(request, query) {
     }
   }
   
-  //console.log(JSON.stringify(dataObj));
-  */
-  
+  console.log(JSON.stringify(dataObj));
   
   return dataObj;
 }

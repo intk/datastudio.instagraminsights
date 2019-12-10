@@ -35,7 +35,19 @@ function getFields() {
       .setName('Account ID')
       .setType(types.TEXT);  
   
-   fields.newDimension()
+  fields.newMetric()
+      .setId('profileFollowers')
+      .setName('Followers')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+   fields.newMetric()
+      .setId('profileImpressions')
+      .setName('Impressions')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newDimension()
       .setId('postDate')
       .setName('Post Date')
       .setType(types.YEAR_MONTH_DAY);
@@ -99,6 +111,12 @@ function getData(request) {
     
     // Try to re-assign data when it fails at first attempt, until rows are filled in
     while (rows.length < 1) {
+      if (field.name == 'profileFollowers') {
+        outputData.profile_followers = graphData(request, "?fields=followers_count");
+      }
+      if (field.name == 'profileImpressions') {
+        outputData.profile_impressions = graphData(request, "insights?metric=impressions&period=day&fields=values");
+      }
       if (field.name == 'accountId') {
         outputData.account_id = graphData(request, "?fields=id,name");
       }
@@ -137,6 +155,40 @@ function reportAccountId(report) {
   row["accountId"] = report['id'];
   rows[0] = row;
   
+  return rows;
+}
+
+function reportFollowers(report) {
+  var rows = [];
+    
+  var row = {};
+  row["profileFollowers"] = report['followers_count'];
+  rows[0] = row;
+  
+  return rows;
+}
+
+// Report all daily reports to rows 
+function reportDaily(report, type) {
+  var rows = [];
+  
+  //Loop chunks
+  for (var c = 0; c <  report['data'][0]['values'].length; c++) {
+  
+    var valueRows = report['data'][0]['values'][c];
+    
+    // Loop report
+    for (var i = 0; i < valueRows.length; i++) {
+      var row = {};
+      
+      row[type] = report['data'][0]['values'][c][i]['value'];
+      
+      // Assign all data to rows list
+      rows.push(row);
+    }
+  }
+    console.log("REPORTDAILY: %s", rows);
+
   return rows;
 }
 
@@ -182,6 +234,12 @@ function reportToRows(requestedFields, report) {
   if (typeof report.account_id !== 'undefined') {
     data = reportAccountId(report.account_id) || [];
   } 
+  if (typeof report.profile_followers !== 'undefined') {
+    data = reportFollowers(report.profile_followers) || [];
+  } 
+  if (typeof report.profile_impressions !== 'undefined') {
+    data = reportDaily(report.profile_impressions, 'profileImpressions');
+  }  
   if (typeof report.posts !== 'undefined') {
     data = reportPosts(report.posts) || [];
   } 
@@ -218,6 +276,10 @@ function reportToRows(requestedFields, report) {
          switch (field.getId()) {
            case 'accountId':
              return row.push(data[i]["accountId"]);
+           case 'profileFollowers':
+             return row.push(data[i]["profileFollowers"]);
+           case 'profileImpressions':
+             return row.push(data[i]["profileImpressions"]);
          }
        }
       
