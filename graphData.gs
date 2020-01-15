@@ -146,7 +146,8 @@ function graphData(request, query) {
     // Define properties
     dataObj = {'followers_count':{},
                'impressions':{},
-               'reach':{}};    
+               'reach':{},
+               'engagement':{}};    
     // Loop queryChunks
     for(var i = 0; i < queryChunks.length; i++) {
             
