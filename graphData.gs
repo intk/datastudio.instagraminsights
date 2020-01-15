@@ -1,7 +1,21 @@
+function getGraphData(url) {
+  url = encodeURI(url);
+
+  try {
+    // Try and fetch the specified url.
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true});
+    return response;
+
+  } catch (e) {
+    
+    var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true});
+    return response;
+  }
+}
+
 // Get data from Facebook Graph API
-function graphData(request, query) {
+function graphData(request, query) {  
   var pageId = request.configParams['page_id'];
-  
   var requestEndpoint = "https://graph.facebook.com/v5.0/";
   
   // Set start and end date for query
@@ -14,8 +28,8 @@ function graphData(request, query) {
   -------------------------------------------------------
   */
   
-  var offset = 1; // Results are reported on the day of the startDate and between 'until'. So 1 day is added.
-  var chunkLimit = 30 - offset; // Limit of 30 days of data per query
+  var offset = 2; // Results are reported the day after the startDate and between 'until'. So 2 days are added.
+  var chunkLimit = 93 - offset; // Limit of 93 days of data per query
   var daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24); // Calculate time difference in milliseconds. Then divide it with milliseconds per day 
   
   //console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
@@ -39,7 +53,7 @@ function graphData(request, query) {
               
       // If a chunk already is added to the queryChunks list
       } else {
-        chunk['since'] = new Date(queryChunks[i-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 1 day. 'Since' should start 1 day after last date range chunk
+        chunk['since'] = new Date(queryChunks[i-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 2 days. 'Since' should start 1 day after last date range chunk
         chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(chunkLimit+offset-1)));
       }
             
@@ -52,7 +66,7 @@ function graphData(request, query) {
       
       var leftoverDays = Math.floor((chunksAmount - queryChunks.length) * chunkLimit) // Decimal number * chunkLimit rounded down gives the amount of leftover days
       var chunk = {};
-      chunk['since'] = new Date(queryChunks[queryChunks.length-1]['until'].getTime()-(86400000*(offset-1))); // 'Since' should start 1 day after last date range chunk
+      chunk['since'] = new Date(queryChunks[queryChunks.length-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 2 days. 'Since' should start 1 day after last date range chunk
       chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(leftoverDays + offset)));
       
       // Add chunk to queryChunks list
@@ -75,8 +89,6 @@ function graphData(request, query) {
       // Add chunk to queryChunks list
       queryChunks.push(chunk);
   }
-  
-  console.log(JSON.stringify(queryChunks));
    
   /*
   ------------------------------------------------------
@@ -84,8 +96,9 @@ function graphData(request, query) {
   ------------------------------------------------------
   */
   
-  /*
-  //Get page access token
+  
+  
+  /*//Get page access token
   var tokenUrl = requestEndpoint+"?fields=access_token";
   var tokenResponse = UrlFetchApp.fetch(tokenUrl,
       {
@@ -93,13 +106,13 @@ function graphData(request, query) {
         muteHttpExceptions : true
       });
   var pageToken = JSON.parse(tokenResponse).access_token;
-  //
   */
+  
   
   //Use pageToken for testing purposes
   var pageToken = PAGE_TOKEN;
-    
-  //Get instagram account ID
+  
+   //Get instagram account ID
   var instagramUrl = requestEndpoint+pageId+"/?fields=instagram_business_account&access_token="+pageToken;
   var instagramResponse = UrlFetchApp.fetch(instagramUrl,
       {
@@ -114,52 +127,21 @@ function graphData(request, query) {
   var dataObj = {};
  // console.log(queryChunks);
   
-  
-  // If page name, id, followers_count
-  if (query.indexOf('?fields=id,name') > -1 || query.indexOf('?fields=followers_count') > -1) {
+  // If page name, id
+  if (query.indexOf('?fields=id,name') > -1) {
         
     // Perform API Request
     var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
     
     console.log(requestUrl);
     
-    var response = UrlFetchApp.fetch(requestUrl,
-      {
-        muteHttpExceptions : true
-      });
-    
-    dataObj = JSON.parse(response);
-  }
-  
-  // If posts object
-  else if (query.indexOf('media') > -1) {
-    // Set date range parameters
-    /*var dateRangeSince = queryChunks[0]['since'].toISOString().slice(0, 10);
-    var dateRangeUntil = queryChunks[queryChunks.length-1]['until'].toISOString().slice(0, 10);
-    
-    var dateRange = "&since="+dateRangeSince+"&until="+dateRangeUntil;
-    */
-        
-    // Perform API Request
-    var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
-    
-    console.log(requestUrl);
-        
-    var response = UrlFetchApp.fetch(requestUrl,
-      {
-        muteHttpExceptions : true
-      });
-    
-    dataObj = JSON.parse(response);
-        
-    
-  // All other objects  
+    //Parse data
+    dataObj = JSON.parse(getGraphData(requestUrl));
   } else {
-  
-    dataObj['data'] = [];
-    dataObj['data'][0] = {};
-    dataObj['data'][0]['values'] = [];
     
+    
+    // Define properties
+    dataObj = {'followers_count':{}};    
     // Loop queryChunks
     for(var i = 0; i < queryChunks.length; i++) {
       
@@ -167,28 +149,60 @@ function graphData(request, query) {
       var dateRangeSince = queryChunks[i]['since'].toISOString().slice(0, 10);
       var dateRangeUntil = queryChunks[i]['until'].toISOString().slice(0, 10);
       
-      
-      var dateRange = "&since="+dateRangeSince+"&until="+dateRangeUntil;
+      //Replace all occurences of date range placeholders from query
+      query = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dateUntil\]/g, dateRangeUntil);
       
       // Perform API Request
-      var requestUrl = requestEndpoint+query+dateRange+"&access_token="+pageToken;
-                  
-      var response = UrlFetchApp.fetch(requestUrl,
-                                       {
-                                         muteHttpExceptions : true
-                                       });
+      var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
       
-      var parseData = JSON.parse(response);      
+      console.log(requestUrl);
+      
+      // Parse data
+      var parseData = JSON.parse(getGraphData(requestUrl));
+      
+      // Loop all nested objects in parseData object
+      for (var parsedObj in parseData) {
+        
+        // Determine if object already contains data
+        if (typeof parseData[parsedObj]['data'] === 'undefined') {
+          dataObj[parsedObj] = parseData[parsedObj];
+        }
+        
+        // Determine if 'data' object exists in nested object
+        if (typeof parseData[parsedObj]['data'] !== 'undefined' &&  parseData[parsedObj]['data'].length > 0) {
+          
+          
+          // Determine if nested object is a 'posts' object
+          if (parsedObj == 'posts') {
+            dataObj[parsedObj] = parseData[parsedObj];
+          } else {
             
-      // Merge data object with values from response
-      if (parseData['data'].length > 0) {
-          dataObj['data'][0]['values'].push(parseData['data'][0]['values']);
+            for(var d = 0; d < parseData[parsedObj]['data'].length; d++) {
+              for (var property in dataObj) {
+                
+                // Determine if property exists in data object
+                if (parseData[parsedObj]['data'][d]['name'] == property) {
+                  var dataPeriod = parseData[parsedObj]['data'][d]['period'];
+                  dataObj[property]['daysBetween'] = daysBetween;
+                  dataObj[property][dataPeriod] = [];
+                  dataObj[property][dataPeriod].push(parseData[parsedObj]['data'][d]['values']);
+                  
+                }
+                
+              }
+              
+            }
+          }
+          
+        }
+        
       }
       
     }
   }
   
   console.log(JSON.stringify(dataObj));
+  
   
   return dataObj;
 }
