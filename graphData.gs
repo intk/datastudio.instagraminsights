@@ -29,7 +29,7 @@ function graphData(request, query) {
   */
   
   var offset = 1; // Results are reported on the startDate and between 'until'. So 1 day is added.
-  var chunkLimit = 31 - offset; // Limit of 30 days of data per query
+  var chunkLimit = 30 - offset; // Limit of 30 days of data per query
   var daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24); // Calculate time difference in milliseconds. Then divide it with milliseconds per day 
   
   //console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
@@ -67,7 +67,7 @@ function graphData(request, query) {
       var leftoverDays = Math.floor((chunksAmount - queryChunks.length) * chunkLimit) // Decimal number * chunkLimit rounded down gives the amount of leftover days
       var chunk = {};
       chunk['since'] = new Date(queryChunks[queryChunks.length-1]['until'].getTime()-(86400000*(offset-1))); // 'Until' has offset of 2 days. 'Since' should start 1 day after last date range chunk
-      chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(leftoverDays + offset)));
+      chunk['until'] = new Date(chunk['since'].getTime()+(86400000*(leftoverDays)));
       
       // Add chunk to queryChunks list
       queryChunks.push(chunk);
@@ -112,6 +112,8 @@ function graphData(request, query) {
   //Use pageToken for testing purposes
   var pageToken = PAGE_TOKEN;
   
+  /*
+  
    //Get instagram account ID
   var instagramUrl = requestEndpoint+pageId+"/?fields=instagram_business_account&access_token="+pageToken;
   var instagramResponse = UrlFetchApp.fetch(instagramUrl,
@@ -119,13 +121,14 @@ function graphData(request, query) {
         muteHttpExceptions : true
       });
   var instagramId = JSON.parse(instagramResponse).instagram_business_account.id;
+  */
   
-  requestEndpoint += instagramId+"/";
+  requestEndpoint += "17841401589674018"+"/";
   
   
   // Define data object to push the graph data to
   var dataObj = {};
- // console.log(queryChunks);
+  //console.log(queryChunks);
   
   // If page name, id
   if (query.indexOf('?fields=id,name') > -1) {
@@ -142,14 +145,15 @@ function graphData(request, query) {
     
     // Define properties
     dataObj = {'followers_count':{},
-               'impressions':{}};    
+               'impressions':{},
+               'reach':{}};    
     // Loop queryChunks
     for(var i = 0; i < queryChunks.length; i++) {
-      
+            
       // Set date range parameters
       var dateRangeSince = queryChunks[i]['since'].toISOString().slice(0, 10);
       var dateRangeUntil = queryChunks[i]['until'].toISOString().slice(0, 10);
-      
+            
       //Add right period to data request to exclude non-unique users from 7 or 28 days data
       var periodOfData = 'day';
       if (daysBetween == 27) {
@@ -160,13 +164,14 @@ function graphData(request, query) {
       }
       
       //Replace all occurences of date range placeholders from query
-      query = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dataPeriod\]/g, periodOfData);
+      var requestQuery = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dataPeriod\]/g, periodOfData);
+      
       
       // Perform API Request
-      var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
+      var requestUrl = requestEndpoint+requestQuery+"&access_token="+pageToken;
       
       console.log(requestUrl);
-      
+
       // Parse data
       var parseData = JSON.parse(getGraphData(requestUrl));
       
@@ -183,7 +188,7 @@ function graphData(request, query) {
           
           
           // Determine if nested object is a 'posts' object
-          if (parsedObj == 'posts') {
+          if (parsedObj == 'media') {
             dataObj[parsedObj] = parseData[parsedObj];
           } else {
             
@@ -211,7 +216,7 @@ function graphData(request, query) {
     }
   }
   
-  console.error(JSON.stringify(dataObj));
+  //console.error(JSON.stringify(dataObj));
   
   
   return dataObj;
