@@ -28,8 +28,8 @@ function graphData(request, query) {
   -------------------------------------------------------
   */
   
-  var offset = 2; // Results are reported the day after the startDate and between 'until'. So 2 days are added.
-  var chunkLimit = 93 - offset; // Limit of 93 days of data per query
+  var offset = 1; // Results are reported on the startDate and between 'until'. So 1 day is added.
+  var chunkLimit = 31 - offset; // Limit of 30 days of data per query
   var daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24); // Calculate time difference in milliseconds. Then divide it with milliseconds per day 
   
   //console.log("query: %s, startDate: %s, endDate: %s, daysBetween: %s", query, startDate, endDate, daysBetween);
@@ -141,7 +141,8 @@ function graphData(request, query) {
     
     
     // Define properties
-    dataObj = {'followers_count':{}};    
+    dataObj = {'followers_count':{},
+               'impressions':{}};    
     // Loop queryChunks
     for(var i = 0; i < queryChunks.length; i++) {
       
@@ -149,8 +150,17 @@ function graphData(request, query) {
       var dateRangeSince = queryChunks[i]['since'].toISOString().slice(0, 10);
       var dateRangeUntil = queryChunks[i]['until'].toISOString().slice(0, 10);
       
+      //Add right period to data request to exclude non-unique users from 7 or 28 days data
+      var periodOfData = 'day';
+      if (daysBetween == 27) {
+        periodOfData = 'days_28';
+      }
+      else if (daysBetween == 6) {
+        periodOfData = 'week';
+      }
+      
       //Replace all occurences of date range placeholders from query
-      query = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dateUntil\]/g, dateRangeUntil);
+      query = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dataPeriod\]/g, periodOfData);
       
       // Perform API Request
       var requestUrl = requestEndpoint+query+"&access_token="+pageToken;
@@ -201,7 +211,7 @@ function graphData(request, query) {
     }
   }
   
-  console.log(JSON.stringify(dataObj));
+  console.error(JSON.stringify(dataObj));
   
   
   return dataObj;

@@ -32,7 +32,13 @@ function getFields() {
   
   fields.newMetric()
       .setId('profileFollowers')
-      .setName('Followers')
+      .setName('Profile Followers')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newMetric()
+      .setId('profileImpressions')
+      .setName('Profile Impressions')
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
@@ -47,7 +53,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions).period([dataPeriod]).since([dateSince]).until([dateUntil])");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -63,6 +69,9 @@ function getData(request) {
     
         if (field.name == 'profileFollowers') {
           outputData.profile_followers = nestedData['followers_count'];
+        }
+        if (field.name == 'profileImpressions') {
+          outputData.profile_impressions = nestedData['impressions'];
         }
         
         if (typeof outputData !== 'undefined') {    
@@ -100,6 +109,34 @@ function periodData(report) {
   return report;
 }
 
+// Report all daily reports to rows 
+function reportDaily(report, type) {
+  var rows = [];
+  
+    //Exclude non-unique users from 7 or 28 days data
+    report = periodData(report);
+  
+    
+  //Loop chunks
+  for (var c = 0; c <  report.length; c++) {
+  
+    var valueRows = report[c];
+    
+    // Loop report
+    for (var i = 0; i < valueRows.length; i++) {
+      var row = {};
+      
+      row[type] = report[c][i]['value'];
+      
+      // Assign all data to rows list
+      rows.push(row);
+      
+    }
+  }
+
+  return rows;
+}
+
 function reportSingleMetric(report, type) {
   var rows = [];
   var row = {};
@@ -116,6 +153,9 @@ function reportToRows(requestedFields, report) {
   
   if (typeof report.profile_followers !== 'undefined') {
     data = data.concat(reportSingleMetric(report.profile_followers, 'profileFollowers'));
+  }
+  if (typeof report.profile_impressions !== 'undefined') {
+    data = data.concat(reportDaily(report.profile_impressions, 'profileImpressions'));
   }
   
   // Merge data
