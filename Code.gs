@@ -42,6 +42,33 @@ function getFields() {
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
+  fields.newMetric()
+      .setId('profileReach')
+      .setName('Profile Reach')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newDimension()
+      .setId('postDate')
+      .setName('Post Date')
+      .setType(types.YEAR_MONTH_DAY);
+
+  fields.newDimension()
+      .setId('postCaption')
+      .setName('Post Caption')
+      .setType(types.TEXT);  
+
+  fields.newDimension()
+      .setId('postLink')
+      .setName('Link to post')
+      .setType(types.URL);
+
+  fields.newDimension()
+       .setId('postMessageHyperLink')
+       .setName('Post Caption Link')
+       .setType(types.HYPERLINK)
+       .setFormula('HYPERLINK($postLink,$postCaption)');
+  
   return fields;
 }
 
@@ -53,7 +80,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions).period([dataPeriod]).since([dateSince]).until([dateUntil])");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions, reach).period([dataPeriod]).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink)");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -72,6 +99,12 @@ function getData(request) {
         }
         if (field.name == 'profileImpressions') {
           outputData.profile_impressions = nestedData['impressions'];
+        }
+        if (field.name == 'profileReach') {
+          outputData.profile_reach = nestedData['reach'];
+        }
+        if (field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink') {
+          outputData.posts = nestedData['media'];
         }
         
         if (typeof outputData !== 'undefined') {    
@@ -114,7 +147,7 @@ function reportDaily(report, type) {
   var rows = [];
   
     //Exclude non-unique users from 7 or 28 days data
-    report = periodData(report);
+    report = periodData(report) ;
   
     
   //Loop chunks
@@ -147,6 +180,42 @@ function reportSingleMetric(report, type) {
   
 }
 
+function reportPosts(report) {  
+  var rows = [];
+
+  // Loop posts
+  for( var i = 0; i < report.data.length; i++) {
+
+    // Define empty row object
+    var row = {};
+    
+    //Return date object to ISO formatted string
+    row["postDate"] = new Date(report.data[i]['timestamp']).toISOString().slice(0, 10);
+
+    row["postCaption"] = report.data[i]['caption'];
+    row["postLink"] = report.data[i]['permalink'];
+    
+    /*
+
+    row["postLikes"] = 0;
+
+    // Determine if likes object exist
+    if (typeof report.data[i]['like_count'] !== 'undefined') {
+      row["postLikes"] = report.data[i]['like_count'];
+    }
+
+    row["postComments"] = 0;
+    if (typeof report.data[i]['comments_count'] !== 'undefined') {
+      row["postComments"] = report.data[i]['comments_count'];
+    }
+    */
+
+    // Assign all post data to rows list
+    rows.push(row);
+  }
+  return rows;
+}
+
 function reportToRows(requestedFields, report) {
   var rows = [];
   var data = [];  
@@ -157,6 +226,12 @@ function reportToRows(requestedFields, report) {
   if (typeof report.profile_impressions !== 'undefined') {
     data = data.concat(reportDaily(report.profile_impressions, 'profileImpressions'));
   }
+  if (typeof report.profile_reach !== 'undefined') {
+    data = data.concat(reportDaily(report.profile_reach, 'profileReach'));
+  }
+  if (typeof report.posts !== 'undefined') {
+    data = data.concat(reportPosts(report.posts));
+  }  
   
   // Merge data
   for(var i = 0; i < data.length; i++) {
