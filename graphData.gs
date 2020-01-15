@@ -123,7 +123,7 @@ function graphData(request, query) {
   var instagramId = JSON.parse(instagramResponse).instagram_business_account.id;
   */
   
-  requestEndpoint += "17841401589674018"+"/";
+  requestEndpoint += "17841400245502227"+"/";
   
   
   // Define data object to push the graph data to
@@ -153,18 +153,9 @@ function graphData(request, query) {
       // Set date range parameters
       var dateRangeSince = queryChunks[i]['since'].toISOString().slice(0, 10);
       var dateRangeUntil = queryChunks[i]['until'].toISOString().slice(0, 10);
-            
-      //Add right period to data request to exclude non-unique users from 7 or 28 days data
-      var periodOfData = 'day';
-      if (daysBetween == 27) {
-        periodOfData = 'days_28';
-      }
-      else if (daysBetween == 6) {
-        periodOfData = 'week';
-      }
       
       //Replace all occurences of date range placeholders from query
-      var requestQuery = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil).replace(/\[dataPeriod\]/g, periodOfData);
+      var requestQuery = query.replace(/\[dateSince\]/g, dateRangeSince).replace(/\[dateUntil\]/g, dateRangeUntil);
       
       
       // Perform API Request

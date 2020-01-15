@@ -69,6 +69,12 @@ function getFields() {
        .setType(types.HYPERLINK)
        .setFormula('HYPERLINK($postLink,$postCaption)');
   
+  fields.newMetric()
+      .setId('postReach')
+      .setName('Reach on post')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
   return fields;
 }
 
@@ -80,7 +86,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions, reach).period([dataPeriod]).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink)");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions, reach).period(day,week,days_28).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach))");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -103,7 +109,7 @@ function getData(request) {
         if (field.name == 'profileReach') {
           outputData.profile_reach = nestedData['reach'];
         }
-        if (field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink') {
+        if (field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink' || field.name == 'postReach') {
           outputData.posts = nestedData['media'];
         }
         
@@ -194,6 +200,7 @@ function reportPosts(report) {
 
     row["postCaption"] = report.data[i]['caption'];
     row["postLink"] = report.data[i]['permalink'];
+    row["postReach"] = report.data[i].insights.data[0].values[0]['value'];
     
     /*
 
