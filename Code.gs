@@ -120,8 +120,11 @@ function getData(request) {
           outputData.profile_views = nestedData['profile_views'];
         }
     
-       if (field.name == 'profileNewFollowers') {
+        if (field.name == 'profileNewFollowers') {
           outputData.profile_new_followers = nestedData['follower_count'];
+        }
+        if (field.name == 'postDate') {
+          outputData.posts = nestedData['media'];
         }
         
         if (typeof outputData !== 'undefined') {    
@@ -153,6 +156,9 @@ function reportToRows(requestedFields, report) {
   if (typeof report.profile_new_followers !== 'undefined') {
     data = data.concat(reportMetric(report.profile_new_followers, 'profileNewFollowers'));
   }
+  if (typeof report.posts !== 'undefined') {
+    data = data.concat(reportPosts(report.posts));
+  }  
   
   // Merge data
   for(var i = 0; i < data.length; i++) {
