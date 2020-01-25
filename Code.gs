@@ -42,6 +42,12 @@ function getFields() {
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
+  fields.newMetric()
+      .setId('profileNewFollowers')
+      .setName('New Followers')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
   fields.newDimension()
       .setId('postDate')
       .setName('Post Date')
@@ -86,7 +92,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count,insights.metric(profile_views).period(day).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach,engagement))");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(profile_views, follower_count).period(day).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach,engagement))");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -106,6 +112,10 @@ function getData(request) {
     
         if (field.name == 'profileViews') {
           outputData.profile_views = nestedData['profile_views'];
+        }
+    
+       if (field.name == 'profileNewFollowers') {
+          outputData.profile_new_followers = nestedData['follower_count'];
         }
         
         if (typeof outputData !== 'undefined') {    
@@ -133,6 +143,9 @@ function reportToRows(requestedFields, report) {
   }
   if (typeof report.profile_views !== 'undefined') {
     data = data.concat(reportMetric(report.profile_views, 'profileViews'));
+  }
+  if (typeof report.profile_new_followers !== 'undefined') {
+    data = data.concat(reportMetric(report.profile_new_followers, 'profileNewFollowers'));
   }
   
   // Merge data
