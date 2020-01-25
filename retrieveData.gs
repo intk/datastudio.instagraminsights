@@ -15,6 +15,17 @@ function reportMetric(report, type) {
       
       row[type] = report[c][i]['value'];
       
+      if (type == 'profileNewFollowers') {
+        
+      // Don't show zeroes, when there is no data
+      if (row[type] == 0) {
+        row[type] = "";
+      }
+        
+        //Change date format to Month (from YYYY-MM-DD to MM)
+        row['profileNewFollowersMonth'] = new Date(report[c][i]['end_time']).toISOString().slice(4, 7).replace(/-/g, '');
+      }
+      
       // Assign all data to rows list
       rows.push(row);
       

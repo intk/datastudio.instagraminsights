@@ -48,6 +48,12 @@ function getFields() {
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
+   
+  fields.newDimension()
+      .setId('profileNewFollowersMonth')
+      .setName('New Followers Month')
+      .setType(types.MONTH);
+  
   fields.newDimension()
       .setId('postDate')
       .setName('Post Date')
