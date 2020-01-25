@@ -37,14 +37,8 @@ function getFields() {
       .setAggregation(aggregations.SUM);
   
   fields.newMetric()
-      .setId('profileImpressions')
-      .setName('Profile Impressions')
-      .setType(types.NUMBER)
-      .setAggregation(aggregations.SUM);
-  
-  fields.newMetric()
-      .setId('profileReach')
-      .setName('Profile Reach')
+      .setId('profileViews')
+      .setName('Profile Views')
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
@@ -92,7 +86,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count,insights.metric(impressions, reach).period(day,week,days_28).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach,engagement))");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(profile_views).period(day).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach,engagement))");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -109,14 +103,9 @@ function getData(request) {
         if (field.name == 'profileFollowers') {
           outputData.profile_followers = nestedData['followers_count'];
         }
-        if (field.name == 'profileImpressions') {
-          outputData.profile_impressions = nestedData['impressions'];
-        }
-        if (field.name == 'profileReach') {
-          outputData.profile_reach = nestedData['reach'];
-        }
-        if (field.name == 'postDate' || field.name == 'postCaption' || field.name == 'postLink' || field.name == 'postReach' || field.name == 'postEngagement') {
-          outputData.posts = nestedData['media'];
+    
+        if (field.name == 'profileViews') {
+          outputData.profile_views = nestedData['profile_views'];
         }
         
         if (typeof outputData !== 'undefined') {    
@@ -135,101 +124,6 @@ function getData(request) {
   return result;  
 }
 
-
-//Exclude non-unique users from 7 or 28 days data
-function periodData(report) {
-  
-  if (report.daysBetween == 27 && typeof report.days_28 !== 'undefined') {
-    report = report.days_28;
-    report[report.length-1] = report[report.length-1].slice(report[report.length-1].length-1);
-  }
-  else if (report.daysBetween == 6 && typeof report.week !== 'undefined') {
-    report = report.week;
-    report[report.length-1] = report[report.length-1].slice(report[report.length-1].length-1);
-    
-    // If date range is not 7 or 28 days
-  } else {
-    report = report.day;
-  }
-  return report;
-}
-
-// Report all daily reports to rows 
-function reportDaily(report, type) {
-  var rows = [];
-  
-    //Exclude non-unique users from 7 or 28 days data
-    report = periodData(report) ;
-  
-    
-  //Loop chunks
-  for (var c = 0; c <  report.length; c++) {
-  
-    var valueRows = report[c];
-    
-    // Loop report
-    for (var i = 0; i < valueRows.length; i++) {
-      var row = {};
-      
-      row[type] = report[c][i]['value'];
-      
-      // Assign all data to rows list
-      rows.push(row);
-      
-    }
-  }
-
-  return rows;
-}
-
-function reportSingleMetric(report, type) {
-  var rows = [];
-  var row = {};
-  row[type] = report;
-  rows[0] = row;
-  
-  return rows;
-  
-}
-
-function reportPosts(report) {  
-  var rows = [];
-
-  // Loop posts
-  for( var i = 0; i < report.data.length; i++) {
-
-    // Define empty row object
-    var row = {};
-    
-    //Return date object to ISO formatted string
-    row["postDate"] = new Date(report.data[i]['timestamp']).toISOString().slice(0, 10);
-
-    row["postCaption"] = report.data[i]['caption'];
-    row["postLink"] = report.data[i]['permalink'];
-    row["postReach"] = report.data[i].insights.data[0].values[0]['value'];
-    row["postEngagement"] = report.data[i].insights.data[1].values[0]['value'];
-    
-    /*
-
-    row["postLikes"] = 0;
-
-    // Determine if likes object exist
-    if (typeof report.data[i]['like_count'] !== 'undefined') {
-      row["postLikes"] = report.data[i]['like_count'];
-    }
-
-    row["postComments"] = 0;
-    if (typeof report.data[i]['comments_count'] !== 'undefined') {
-      row["postComments"] = report.data[i]['comments_count'];
-    }
-    */
-
-    // Assign all post data to rows list
-    rows.push(row);
-  }
-  return rows;
-}
-
 function reportToRows(requestedFields, report) {
   var rows = [];
   var data = [];  
@@ -237,15 +131,9 @@ function reportToRows(requestedFields, report) {
   if (typeof report.profile_followers !== 'undefined') {
     data = data.concat(reportSingleMetric(report.profile_followers, 'profileFollowers'));
   }
-  if (typeof report.profile_impressions !== 'undefined') {
-    data = data.concat(reportDaily(report.profile_impressions, 'profileImpressions'));
+  if (typeof report.profile_views !== 'undefined') {
+    data = data.concat(reportMetric(report.profile_views, 'profileViews'));
   }
-  if (typeof report.profile_reach !== 'undefined') {
-    data = data.concat(reportDaily(report.profile_reach, 'profileReach'));
-  }
-  if (typeof report.posts !== 'undefined') {
-    data = data.concat(reportPosts(report.posts));
-  }  
   
   // Merge data
   for(var i = 0; i < data.length; i++) {

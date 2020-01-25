@@ -145,9 +145,7 @@ function graphData(request, query) {
     
     // Define properties
     dataObj = {'followers_count':{},
-               'impressions':{},
-               'reach':{},
-               'engagement':{}};    
+               'profile_views':{}};    
     // Loop queryChunks
     for(var i = 0; i < queryChunks.length; i++) {
             
@@ -191,7 +189,11 @@ function graphData(request, query) {
                 if (parseData[parsedObj]['data'][d]['name'] == property) {
                   var dataPeriod = parseData[parsedObj]['data'][d]['period'];
                   dataObj[property]['daysBetween'] = daysBetween;
-                  dataObj[property][dataPeriod] = [];
+                  
+                  // Declare data object when it does not exist
+                  if (typeof dataObj[property][dataPeriod] === 'undefined') {
+                    dataObj[property][dataPeriod] = [];
+                  }
                   dataObj[property][dataPeriod].push(parseData[parsedObj]['data'][d]['values']);
                   
                 }
