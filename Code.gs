@@ -36,6 +36,18 @@ function getFields() {
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
+  fields.newDimension()
+      .setId('profileInteractionsMonth')
+      .setName('Interactions Month')
+      .setGroup('Interactions')
+      .setType(types.MONTH);
+  
+   fields.newMetric()
+      .setId('profileWebsiteClicks')
+      .setName('Website Clicks')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
   fields.newMetric()
       .setId('profileViews')
       .setName('Profile Views')
@@ -54,6 +66,50 @@ function getFields() {
       .setName('New Followers Month')
       .setType(types.MONTH);
   
+  fields.newMetric()
+      .setId('profilePostsImpressions')
+      .setName('Total Impressions')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newDimension()
+      .setId('profilePostsImpressionsMonth')
+      .setName('Impressions Month')
+      .setType(types.MONTH);
+  
+  fields.newDimension()
+      .setId('profileFollowersGender')
+      .setName('Gender')
+      .setType(types.TEXT);
+
+  fields.newMetric()
+      .setId('profileFollowersGenderNumber')
+      .setName('Followers per Gender')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newDimension()
+      .setId('profileFollowersAge')
+      .setName('Age')
+      .setType(types.TEXT);
+
+  fields.newMetric()
+      .setId('profileFollowersNumber')
+      .setName('Followers per Age')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
+  fields.newDimension()
+      .setId('profileAudienceLanguage')
+      .setName('Language')
+      .setType(types.TEXT);
+  
+  fields.newMetric()
+      .setId('profileAudienceLanguageFollowers')
+      .setName('Followers per Language')
+      .setType(types.NUMBER)
+      .setAggregation(aggregations.SUM);
+  
   fields.newDimension()
       .setId('postDate')
       .setName('Post Date')
@@ -63,11 +119,27 @@ function getFields() {
       .setId('postCaption')
       .setName('Post Caption')
       .setType(types.TEXT);  
+  
+  fields.newDimension()
+      .setId('postType')
+      .setName('Post Type')
+      .setType(types.TEXT);  
 
   fields.newDimension()
       .setId('postLink')
       .setName('Link to post')
       .setType(types.URL);
+  
+   fields.newDimension()
+      .setId('postImageUrl')
+      .setName('Post Image Url')
+      .setType(types.URL);
+  
+   fields.newDimension()
+       .setId('postImage')
+       .setName('Post Image')
+       .setType(types.IMAGE)
+       .setFormula('IMAGE($postImageUrl)');
 
   fields.newDimension()
        .setId('postMessageHyperLink')
@@ -76,8 +148,8 @@ function getFields() {
        .setFormula('HYPERLINK($postLink,$postCaption)');
   
   fields.newMetric()
-      .setId('postReach')
-      .setName('Reach on post')
+      .setId('postImpressions')
+      .setName('Impressions on post')
       .setType(types.NUMBER)
       .setAggregation(aggregations.SUM);
   
@@ -98,7 +170,7 @@ function getSchema(request) {
 
 function getData(request) {   
   
-  var nestedData = graphData(request, "?fields=followers_count,insights.metric(profile_views, follower_count).period(day).since([dateSince]).until([dateUntil]),media.fields(caption,timestamp,permalink,insights.metric(reach,engagement))");
+  var nestedData = graphData(request, "?fields=followers_count,insights.metric(profile_views, follower_count, impressions, website_clicks).period(day).since([dateSince]).until([dateUntil]).as(profile_posts),insights.metric(audience_gender_age, audience_locale).period(lifetime).as(demographics),media.fields(caption,media_type, media_url, thumbnail_url, timestamp,permalink,insights.metric(impressions,engagement))");
   
   var requestedFieldIds = request.fields.map(function(field) {
     return field.name;
@@ -115,15 +187,29 @@ function getData(request) {
         if (field.name == 'profileFollowers') {
           outputData.profile_followers = nestedData['followers_count'];
         }
+        
+        if (field.name == 'profileViews' || field.name == 'profileWebsiteClicks') {
+          var interactionsData = [nestedData['profile_views'],nestedData['website_clicks']];
+          outputData.profile_interactions = interactionsData;
+        }
+
     
-        if (field.name == 'profileViews') {
-          outputData.profile_views = nestedData['profile_views'];
+        if (field.name == 'profilePostsImpressions') {
+          outputData.profile_posts_impressions = nestedData['impressions'];
         }
     
         if (field.name == 'profileNewFollowers') {
           outputData.profile_new_followers = nestedData['follower_count'];
         }
-        if (field.name == 'postDate') {
+    
+        if (field.name == 'profileFollowersAge' || field.name == 'profileFollowersGender') {
+          outputData.profile_gender_age = nestedData['audience_gender_age'];
+        }
+        if (field.name == 'profileAudienceLanguage') {
+          outputData.profile_audience_language = nestedData['audience_locale'];
+        }
+    
+        if (field.name == 'postDate' || field.name == 'postEngagement') {
           outputData.posts = nestedData['media'];
         }
         
@@ -150,11 +236,20 @@ function reportToRows(requestedFields, report) {
   if (typeof report.profile_followers !== 'undefined') {
     data = data.concat(reportSingleMetric(report.profile_followers, 'profileFollowers'));
   }
-  if (typeof report.profile_views !== 'undefined') {
-    data = data.concat(reportMetric(report.profile_views, 'profileViews'));
+  if (typeof report.profile_interactions !== 'undefined') {
+    data = data.concat(reportInteractions(report.profile_interactions));
+  }
+  if (typeof report.profile_posts_impressions !== 'undefined') {
+    data = data.concat(reportMetric(report.profile_posts_impressions, 'profilePostsImpressions'));
   }
   if (typeof report.profile_new_followers !== 'undefined') {
     data = data.concat(reportMetric(report.profile_new_followers, 'profileNewFollowers'));
+  }
+  if (typeof report.profile_gender_age !== 'undefined') {
+    data = data.concat(reportGenderAge(report.profile_gender_age));
+  }  
+  if (typeof report.profile_audience_language !== 'undefined') {
+    data = data.concat(reportLocale(report.profile_audience_language, 'profileAudienceLanguage'));
   }
   if (typeof report.posts !== 'undefined') {
     data = data.concat(reportPosts(report.posts));
